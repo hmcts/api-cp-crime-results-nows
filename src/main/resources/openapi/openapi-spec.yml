@@ -113,10 +113,6 @@ paths:
                                 value: "HMP/YOI Durham"
         '400':
           $ref: "#/components/responses/BadRequest"
-        '401':
-          $ref: "#/components/responses/Unauthorized"
-        '403':
-          $ref: "#/components/responses/Forbidden"
         '404':
           $ref: "#/components/responses/NotFound"
         '500':
@@ -196,15 +192,7 @@ components:
               parameter: "defendantId"
             timestamp: "2026-09-02T18:05:00Z"
             traceId: "b2f1c3d4e5f60718"
-    Unauthorized:
-      description: >-
-        Authentication is missing or invalid — no bearer token, or an
-        invalid/expired one.
-    Forbidden:
-      description: >-
-        A valid subscription key is required but the caller is not
-        subscribed to this API (APIM subscription-key model — not a missing
-        OAuth2 scope).
+
     NotFound:
       description: >-
         No hearing has been ingested for the supplied hearingId, or no
