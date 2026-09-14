@@ -1,94 +1,509 @@
-openapi: 3.0.0
+openapi: 3.1.0
 servers:
-  - description: API Marketplace api - mocking example api
-    url: https://virtserver.swaggerhub.com/HMCTS-DTS/api-hmcts-crime-template/1.0.0
+  - description: Crime Results NOWs (Notices/Orders/Warrants) API
+    url: https://api-cp-crime-results-nows.net/{version}
+    variables:
+      version:
+        default: 0.0.0
+        description: API version; matches the spec info.version
 
 info:
-  title: API Marketplace api - example api
-  description: API Marketplace api - simple example
-  version: 1.0.0
+  title: Crime Results NOWs (Notices/Orders/Warrants) API
+  description: >-
+    Returns NOW (Notice/Order/Warrant) generation-eligibility and resolved
+    content for a case, hearing and defendant — which registered NOW
+    document type(s) would be generated for a hearing/defendant, and the
+    case/offence/judicial-result detail behind each type. This is a
+    pull, read-only channel; it does not generate documents, resolve
+    recipients, or replace the existing NOW generation/distribution pipeline
+    (ADR-003).
+
+  version: 0.0.0
   contact:
     email: no-reply@hmcts.com
   license:
     name: MIT
     url: 'https://opensource.org/licenses/MIT'
 
-paths:
-  /:
-    get:
-      description: Root endpoint
-      operationId: getRoot
-      tags:
-        - root
+security:
+  - bearerAuth: []
+    subscriptionKey: []
 
+tags:
+  - name: nows
+    description: >-
+      Notice(s)/Order(s)/Warrant(s) (NOWs) generation-eligibility and
+      content, per case, hearing and defendant
+
+paths:
+  /cases/{caseURN}/hearings/{hearingId}/defendants/{defendantId}:
+    get:
+      summary: Get NOW event types and resolved content for a hearing and defendant
+      description: >-
+        Resolves the given defendantId (a raw, per-case identifier — not
+        globally unique on its own, which is why caseURN is required
+        alongside it) to its internal, merged masterDefendantId, then returns
+        every NOW event type matched for that hearing/defendant
+        pairing, together with the offence and judicial-result detail behind
+        each match (ADR-002).
+
+      operationId: getDefendantResult
+      tags:
+        - nows
+      parameters:
+        - $ref: "#/components/parameters/CaseUrnPath"
+        - $ref: "#/components/parameters/HearingIdPath"
+        - $ref: "#/components/parameters/DefendantIdPath"
+        - $ref: "#/components/parameters/EventTypeQuery"
       responses:
         '200':
-          description: OK
-          content:
-            text/plain:
+          description: >-
+            Hearing and defendant are known to this service. Returns every
+            NOW event type matched and its resolved content, or
+            an empty eventTypes array if none matched.
+          headers:
+            X-Correlation-Id:
+              description: Echoes the request correlation ID for end-to-end tracing
               schema:
                 type: string
-                example: Hello
-
-  /example/{example_id}:
-    get:
-      description: Get example for example_id
-      operationId: getExampleByExampleId
-      tags:
-        - examples
-      parameters:
-        - in: path
-          name: example_id
-          required: true
-          description: Unique id for the example - long
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description:  Examples found
+                format: uuid
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExampleResponse"
+                $ref: "#/components/schemas/DefendantResult"
+              example:
+                caseURN: "RC363968376"
+                defendant:
+                  id: "d2151771-41a1-42e1-af36-a99d9b39c0b2"
+                  title: "Mr"
+                  firstName: "Lacy"
+                  lastName: "Braun"
+                  dateOfBirth: "1998-09-02"
+                  address:
+                    address1: "221B Baker Street"
+                    address2: "Baker Street"
+                    address3: "Marylebone"
+                    postCode: "NW1 5BR"
+                  gender: "MALE"
+                hearing:
+                  id: "6988027f-e786-49f4-a00f-7c35ab459464"
+                  courtDetails:
+                    court:
+                      courtHouseName: "Lavender Hill Magistrates' Court"
+                    ljaName: "South West London Magistrates' Court"
+                  hearingDate: "2026-09-02"
+                  jurisdiction: "MAGISTRATES"
+                eventTypes:
+                  - eventType: "WEE_CustodialSentence"
+                    orderName: "Warrant for Custodial Sentence"
+                    matchedAt: "2026-09-02T18:05:00Z"
+                    offences:
+                      - code: "TH68013A"
+                        title: "Attempt theft of motor vehicle"
+                        wording: "Attempt theft to vehicle"
+                        convictionDate: "2026-09-02"
+                        results:
+                          - judicialResultTypeId: "3f8e2a10-9c44-4b6a-8f01-2b7d9e5a6c11"
+                            cjsCode: "RIBA48"
+                            label: "Remanded in custody"
+                            orderedDate: "2026-09-02"
+                            prompts:
+                              - promptReference: "prisonOrganisationName"
+                                label: "Prison organisation name"
+                                value: "HMP/YOI Durham"
         '400':
-          description: Bad input parameter
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '403':
+          $ref: "#/components/responses/Forbidden"
+        '404':
+          $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    subscriptionKey:
+      type: apiKey
+      in: header
+      name: Ocp-Apim-Subscription-Key
+      description: >-
+        HMCTS APIM subscription key identifying the consuming system. Issued
+        per consumer when their APIM product subscription is provisioned.
+
+  parameters:
+    CaseUrnPath:
+      in: path
+      name: caseURN
+      required: true
+      description: >-
+        Unique Case URN identifying the prosecution case. Required alongside
+        defendantId because defendantId is a raw, per-case identifier — not
+        globally unique on its own.
+      schema:
+        type: string
+      example: "RC363968376"
+    HearingIdPath:
+      in: path
+      name: hearingId
+      required: true
+      description: Unique identifier of the hearing
+      schema:
+        type: string
+        format: uuid
+      example: "6988027f-e786-49f4-a00f-7c35ab459464"
+    DefendantIdPath:
+      in: path
+      name: defendantId
+      required: true
+      description: >-
+        Unique, per-case identifier of the defendant — not the internal
+        masterDefendantId merge key, which is never accepted as input.
+      schema:
+        type: string
+        format: uuid
+      example: "d2151771-41a1-42e1-af36-a99d9b39c0b2"
+    EventTypeQuery:
+      in: query
+      name: eventType
+      required: false
+      description: >-
+        Narrow the response to a single NOW event type. Values are
+        drawn from the fixed, subscriber-routable NOW event-type allow-list
+        this service maintains (e.g. WEE_CustodialSentence,
+        NEE_FootballBanning). Omit to return every event type for
+        this defendant.
+      schema:
+        type: string
+      example: "WEE_CustodialSentence"
+
+  responses:
+    BadRequest:
+      description: Bad input parameter
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "BAD_REQUEST"
+            message: "The supplied defendantId is not a valid UUID"
+            details:
+              parameter: "defendantId"
+            timestamp: "2026-09-02T18:05:00Z"
+            traceId: "b2f1c3d4e5f60718"
+    Unauthorized:
+      description: >-
+        Authentication is missing or invalid — no bearer token, or an
+        invalid/expired one.
+    Forbidden:
+      description: >-
+        A valid subscription key is required but the caller is not
+        subscribed to this API (APIM subscription-key model — not a missing
+        OAuth2 scope).
+    NotFound:
+      description: >-
+        No hearing has been ingested for the supplied hearingId, or no
+        record exists for the supplied caseURN/defendantId pair under a
+        hearing that is otherwise known.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "NOT_FOUND"
+            message: "No case, hearing, or defendant found for the supplied identifiers"
+            timestamp: "2026-09-02T18:05:00Z"
+            traceId: "e5c4d6f708192a3b"
+    InternalServerError:
+      description: An unexpected error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "INTERNAL_SERVER_ERROR"
+            message: "An unexpected error occurred while processing the request"
+            timestamp: "2026-09-02T18:05:00Z"
+            traceId: "f6d5e708192a3b4c"
+
   schemas:
-    ExampleResponse:
-      description: Details of examples associated with the example id
+    DefendantResult:
+      description: >-
+        NOW event type(s) and resolved content for one case, hearing
+        and defendant. eventTypes is empty when the hearing/defendant are
+        known but no NOW event type matched.
       type: object
       properties:
-        exampleId:
-          description: Id of the example - long
-          type: integer
-          format: int64
-        exampleText:
-          description: Information associated with the example id
+        caseURN:
+          description: Prosecution case URN this result was recorded against
           type: string
-          example: "Some text"
+          example: "RC363968376"
+        defendant:
+          $ref: "#/components/schemas/Defendant"
+        hearing:
+          $ref: "#/components/schemas/HearingSummary"
+        eventTypes:
+          description: NOW event type(s) matched for this defendant at this hearing
+          type: array
+          items:
+            $ref: "#/components/schemas/EventType"
+
+    Defendant:
+      description: >-
+        Defendant identity as recorded on the prosecution case at this
+        hearing. All fields here are personal data (OFFICIAL-SENSITIVE) —
+        handle per HMCTS data protection policy; do not log. Identified by
+        the raw, per-case defendantId — never by the internal
+        masterDefendantId merge key (ADR-002), which this API never returns.
+      type: object
+      properties:
+        id:
+          description: Unique, per-case identifier of the defendant
+          type: string
+          format: uuid
+          example: "d2151771-41a1-42e1-af36-a99d9b39c0b2"
+        title:
+          type: string
+          nullable: true
+          example: "Mr"
+        firstName:
+          type: string
+          nullable: true
+          example: "Lacy"
+        middleName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+          example: "Braun"
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+          example: "1998-09-02"
+        address:
+          $ref: "#/components/schemas/Address"
+        gender:
+          type: string
+          nullable: true
+          example: "MALE"
+        nationality:
+          type: string
+          nullable: true
+
+    Address:
+      description: A postal address
+      type: object
+      properties:
+        address1:
+          type: string
+          nullable: true
+          example: "221B Baker Street"
+        address2:
+          type: string
+          nullable: true
+          example: "Baker Street"
+        address3:
+          type: string
+          nullable: true
+          example: "Marylebone"
+        address4:
+          type: string
+          nullable: true
+        address5:
+          type: string
+          nullable: true
+        postCode:
+          type: string
+          nullable: true
+          example: "NW1 5BR"
+
+    HearingSummary:
+      description: Facts recorded about the hearing this result was matched at
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the hearing
+          type: string
+          format: uuid
+          example: "6988027f-e786-49f4-a00f-7c35ab459464"
+        courtDetails:
+          $ref: "#/components/schemas/CourtDetails"
+        hearingDate:
+          type: string
+          format: date
+          example: "2026-09-02"
+        jurisdiction:
+          description: The hearing's jurisdiction type
+          type: string
+          nullable: true
+          example: "MAGISTRATES"
+
+    CourtDetails:
+      description: Court venue detail for the hearing
+      type: object
+      nullable: true
+      properties:
+        court:
+          $ref: "#/components/schemas/Court"
+        ljaName:
+          description: Local Justice Area name for the hearing's court centre
+          type: string
+          nullable: true
+          example: "South West London Magistrates' Court"
+
+    Court:
+      description: Court house identity
+      type: object
+      nullable: true
+      properties:
+        courtHouseCode:
+          type: string
+          nullable: true
+          example: "B01LY00"
+        courtHouseName:
+          type: string
+          nullable: true
+          example: "Lavender Hill Magistrates' Court"
+
+    EventType:
+      description: >-
+        A single NOW event type matched for this defendant at
+        this hearing, and the offence/result content behind the match. The
+        event-type universe is a fixed, static allow-list maintained by this
+        service (ADR-002) — never fetched from a downstream system at
+        request time.
+      type: object
+      properties:
+        eventType:
+          description: >-
+            The matched NOW event type, e.g. WEE_CustodialSentence,
+            NEE_FootballBanning.
+          type: string
+          example: "WEE_CustodialSentence"
+        orderName:
+          description: Display name of the matched NOW definition
+          type: string
+          nullable: true
+          example: "Warrant for Custodial Sentence"
+        matchedAt:
+          description: When this event type was matched
+          type: string
+          format: date-time
+          example: "2026-09-02T18:05:00Z"
+        offences:
+          description: Offence(s) and result(s) that back this event type's match
+          type: array
+          items:
+            $ref: "#/components/schemas/Offence"
+
+    Offence:
+      description: >-
+        An offence and the judicial result(s) recorded against it that back
+        a matched event type.
+      type: object
+      properties:
+        code:
+          description: Offence code, aligned with OMS
+          type: string
+          example: "TH68013A"
+        title:
+          type: string
+          nullable: true
+          example: "Attempt theft of motor vehicle"
+        wording:
+          type: string
+          nullable: true
+          example: "Attempt theft to vehicle"
+        convictionDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-09-02"
+        results:
+          description: Judicial result(s) recorded against this offence that matched this event type
+          type: array
+          items:
+            $ref: "#/components/schemas/JudicialResult"
+
+    JudicialResult:
+      description: >-
+        A single judicial result. Keeps the raw judicialResultTypeId and each
+        prompt's raw promptReference — rather than a flattened label/value
+        pair — so downstream NOW document assembly can build on stable keys.
+      type: object
+      properties:
+        judicialResultTypeId:
+          description: CP's stable identifier for this judicial result type
+          type: string
+          format: uuid
+          nullable: true
+          example: "3f8e2a10-9c44-4b6a-8f01-2b7d9e5a6c11"
+        cjsCode:
+          type: string
+          nullable: true
+          example: "RIBA48"
+        label:
+          type: string
+          nullable: true
+          example: "Remanded in custody"
+        orderedDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-09-02"
+        prompts:
+          description: Raw judicial result prompts recorded against this result
+          type: array
+          items:
+            $ref: "#/components/schemas/Prompt"
+
+    Prompt:
+      description: A single prompt recorded against a judicial result
+      type: object
+      properties:
+        promptReference:
+          description: CP's stable reference key for this prompt
+          type: string
+          nullable: true
+          example: "prisonOrganisationName"
+        label:
+          type: string
+          nullable: true
+          example: "Prison organisation name"
+        value:
+          type: string
+          nullable: true
+          example: "HMP/YOI Durham"
 
     ErrorResponse:
+      description: Standard error response
       type: object
       properties:
         error:
           type: string
           description: Machine-readable error code
+          example: "NOT_FOUND"
         message:
           type: string
           description: Human-readable error message
+          example: "No case, hearing, or defendant found for the supplied identifiers"
         details:
           type: object
           additionalProperties: true
+          nullable: true
           description: Additional error context
         timestamp:
           type: string
           format: date-time
+          example: "2026-09-02T18:05:00Z"
         traceId:
           type: string
           description: Unique identifier for error tracing
+          example: "b2f1c3d4e5f60718"
