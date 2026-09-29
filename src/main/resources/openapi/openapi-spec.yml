@@ -101,6 +101,7 @@ paths:
                       - code: "TH68013A"
                         title: "Attempt theft of motor vehicle"
                         wording: "Attempt theft to vehicle"
+                        legislation: "Contrary to section 1(1) of the Criminal Attempts Act 1981."
                         convictionDate: "2026-09-02"
                         results:
                           - judicialResultTypeId: "3f8e2a10-9c44-4b6a-8f01-2b7d9e5a6c11"
@@ -111,6 +112,14 @@ paths:
                               - promptReference: "prisonOrganisationName"
                                 label: "Prison organisation name"
                                 value: "HMP/YOI Durham"
+                    defendantResults:
+                      - judicialResultTypeId: "66105417-41c8-420d-820f-40b61b507442"
+                        label: "Risk or vulnerability factors"
+                        orderedDate: "2026-09-02"
+                        prompts:
+                          - promptReference: "riskOrVulnerabilityFactors"
+                            label: "Risk or vulnerability factors"
+                            value: "RiskFactor"
         '400':
           $ref: "#/components/responses/BadRequest"
         '404':
@@ -390,6 +399,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Offence"
+        defendantResults:
+          description: >-
+            Defendant-level judicial result(s), not recorded against any single
+            offence, that matched this event type
+          type: array
+          items:
+            $ref: "#/components/schemas/JudicialResult"
 
     Offence:
       description: >-
@@ -409,6 +425,11 @@ components:
           type: string
           nullable: true
           example: "Attempt theft to vehicle"
+        legislation:
+          description: The statutory provision the offence is contrary to
+          type: string
+          nullable: true
+          example: "Contrary to section 1(1) of the Criminal Attempts Act 1981."
         convictionDate:
           type: string
           format: date
