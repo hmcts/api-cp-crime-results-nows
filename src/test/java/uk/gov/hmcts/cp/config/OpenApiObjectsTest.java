@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import uk.gov.hmcts.cp.openapi.api.NowsApi;
 import uk.gov.hmcts.cp.openapi.model.DefendantResult;
 import uk.gov.hmcts.cp.openapi.model.ErrorResponse;
+import uk.gov.hmcts.cp.openapi.model.EventType;
+import uk.gov.hmcts.cp.openapi.model.Offence;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,6 +21,16 @@ class OpenApiObjectsTest {
     @Test
     void generated_defendant_result_should_have_expected_fields() {
         assertThat(DefendantResult.class).hasDeclaredFields("caseURN", "defendant", "hearing", "eventTypes");
+    }
+
+    @Test
+    void generated_event_type_should_have_expected_fields() {
+        assertThat(EventType.class).hasDeclaredFields("eventType", "orderName", "matchedAt", "offences", "defendantResults");
+    }
+
+    @Test
+    void generated_offence_should_have_expected_fields() {
+        assertThat(Offence.class).hasDeclaredFields("code", "title", "wording", "legislation", "convictionDate", "results");
     }
 
     @Test
